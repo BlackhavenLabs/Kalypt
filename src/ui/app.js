@@ -148,7 +148,14 @@ function groupFindings(findings) {
     if (!groups.has(key)) groups.set(key, { ...item, matches: [] });
     groups.get(key).matches.push(item);
   }
-  return [...groups.values()];
+
+  const severityRank = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  return [...groups.values()].sort((a, b) => {
+    const rankA = severityRank[a.severity] ?? 99;
+    const rankB = severityRank[b.severity] ?? 99;
+    if (rankA !== rankB) return rankA - rankB;
+    return String(a.title).localeCompare(String(b.title));
+  });
 }
 
 function renderFindingGroup(group) {
@@ -173,14 +180,15 @@ function renderFindingGroup(group) {
 }
 
 function renderMatchPreview(matches) {
-  const previewCount = Math.min(3, matches.length);
-  const preview = matches.slice(0, previewCount).map(renderMatchRow).join('');
-  if (matches.length <= previewCount) return `<div class="match-preview">${preview}</div>`;
-  const remaining = matches.slice(previewCount).map(renderMatchRow).join('');
+  if (!matches.length) return '';
+  const first = renderMatchRow(matches[0]);
+  if (matches.length === 1) return `<div class="match-preview">${first}</div>`;
+
+  const remaining = matches.slice(1).map(renderMatchRow).join('');
   return `
-    <div class="match-preview">${preview}</div>
+    <div class="match-preview">${first}</div>
     <details class="more-details">
-      <summary>+${matches.length - previewCount} more</summary>
+      <summary>Show ${matches.length - 1} more</summary>
       <div class="more-list">${remaining}</div>
     </details>`;
 }

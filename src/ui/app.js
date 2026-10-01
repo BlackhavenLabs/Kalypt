@@ -211,6 +211,8 @@ function renderResults() {
         : '';
   }
 
+  root.append(renderInspectionDetails(details, view));
+
   const groups = groupFindings(findings);
   const hasExpandableGroups = groups.some((group) => group.matches.length > 1);
   const header = document.createElement('div');
@@ -250,8 +252,6 @@ function renderResults() {
     clear.innerHTML = '<strong>No findings</strong><span>Nothing requiring review under this policy.</span>';
     root.append(clear);
   }
-
-  if (details.length) root.append(renderInspectionDetails(details));
 }
 
 function createExportMenu() {
@@ -390,14 +390,28 @@ function renderMatchRow(item, currentPath) {
   return parts.length ? `<div class="match-row">${parts.join('')}</div>` : '';
 }
 
-function renderInspectionDetails(details) {
+function renderInspectionDetails(details, view) {
   const groups = groupFindings(details);
   const wrapper = document.createElement('details');
   wrapper.className = 'inspection-details';
-  wrapper.innerHTML = `<summary>Inspection details <span>${details.length}</span></summary>`;
+  const inspectedCount = state.viewMode === 'all'
+    ? state.entries.filter((entry) => entry.status === 'done').length
+    : 1;
+  wrapper.innerHTML = `<summary>Inspection details <span>${inspectedCount} ${inspectedCount === 1 ? 'file' : 'files'}</span></summary>`;
 
   const list = document.createElement('div');
   list.className = 'inspection-detail-list';
+
+  const scopeRow = document.createElement('div');
+  scopeRow.className = 'inspection-detail-row';
+  scopeRow.innerHTML = `<strong>Scope</strong><span>${state.viewMode === 'all' ? 'All inspected files' : escapeHtml(view.currentPath || 'Selected file')}</span>`;
+  list.append(scopeRow);
+
+  const policyRow = document.createElement('div');
+  policyRow.className = 'inspection-detail-row';
+  policyRow.innerHTML = `<strong>Policy</strong><span>${escapeHtml(state.policy.replaceAll('-', ' '))}</span>`;
+  list.append(policyRow);
+
   for (const group of groups) {
     const row = document.createElement('div');
     row.className = 'inspection-detail-row';

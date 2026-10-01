@@ -15,7 +15,7 @@ export async function startUi({ port = 0, open = true } = {}) {
     '/': ['index.html', 'text/html; charset=utf-8'],
     '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
     '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
-    '/brand-symbol.svg': ['brand-symbol.svg', 'image/svg+xml; charset=utf-8']
+    '/brand-symbol.webp': ['brand-symbol.webp', 'image/webp']
   };
   const server = http.createServer(async (req, res) => {
     try {

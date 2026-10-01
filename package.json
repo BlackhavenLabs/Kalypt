@@ -1,0 +1,54 @@
+{
+  "name": "kalypt",
+  "version": "0.3.0",
+  "description": "Local-first inspection and sanitization for files, documents, archives, media, and source repositories.",
+  "type": "module",
+  "bin": {
+    "kalypt": "./bin/kalypt.js"
+  },
+  "scripts": {
+    "start": "node ./bin/kalypt.js",
+    "ui": "node ./bin/kalypt.js ui --no-open",
+    "test": "node --test",
+    "lint": "node ./scripts/lint.js",
+    "check": "npm run lint && npm test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BlackhavenLabs/Kalypt.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BlackhavenLabs/Kalypt/issues"
+  },
+  "homepage": "https://github.com/BlackhavenLabs/Kalypt#readme",
+  "keywords": [
+    "privacy",
+    "metadata",
+    "security",
+    "exif",
+    "sanitization",
+    "secrets",
+    "office",
+    "pdf",
+    "local-first"
+  ],
+  "author": "Blackhaven Labs",
+  "license": "MIT",
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "examples",
+    "integrations",
+    "assets/brand",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "action.yml"
+  ]
+}

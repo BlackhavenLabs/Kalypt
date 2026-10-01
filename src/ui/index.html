@@ -58,28 +58,24 @@
           <span id="queue-status"></span>
         </div>
       </div>
-      <div id="file-tabs" class="file-tabs"></div>
     </section>
 
     <section id="result" class="result hidden">
-      <div class="summary-grid">
-        <div class="summary-card"><span>Findings</span><strong id="total-count">0</strong></div>
-        <div class="summary-card danger"><span>Critical / High</span><strong id="danger-count">0</strong></div>
-        <div class="summary-card"><span>Removable</span><strong id="removable-count">0</strong></div>
-        <div class="summary-card"><span>Items inspected</span><strong id="item-count">0</strong></div>
-      </div>
-      <div class="result-actions">
-        <button id="clean-button" type="button">Create clean copy</button>
-        <details id="export-menu" class="export-menu">
-          <summary>Export report</summary>
-          <div class="export-options">
-            <button type="button" data-export-format="html">HTML</button>
-            <button type="button" data-export-format="csv">CSV</button>
-            <button type="button" data-export-format="json">JSON</button>
+      <div class="inspection-overview">
+        <div id="file-tabs" class="file-tabs"></div>
+        <div class="summary-area">
+          <div class="summary-grid">
+            <div class="summary-card"><span>Findings</span><strong id="total-count">0</strong></div>
+            <div class="summary-card danger"><span>Critical / High</span><strong id="danger-count">0</strong></div>
+            <div class="summary-card"><span>Removable</span><strong id="removable-count">0</strong></div>
+            <div class="summary-card"><span>Items inspected</span><strong id="item-count">0</strong></div>
           </div>
-        </details>
+          <div class="result-actions">
+            <button id="clean-button" type="button">Create clean copy</button>
+          </div>
+          <div id="clean-note" class="note"></div>
+        </div>
       </div>
-      <div id="clean-note" class="note"></div>
       <div id="findings" class="findings"></div>
     </section>
   </main>

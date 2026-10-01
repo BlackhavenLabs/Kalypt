@@ -14,8 +14,12 @@ async function boot() {
     option.textContent = policy.replaceAll('-', ' ');
     $('policy').append(option);
   }
+
   $('policy').value = state.policy;
-  $('policy').addEventListener('change', () => { state.policy = $('policy').value; rescanAll(); });
+  $('policy').addEventListener('change', () => {
+    state.policy = $('policy').value;
+    rescanAll();
+  });
 
   $('choose-files').addEventListener('click', () => fileInput.click());
   $('choose-folder').addEventListener('click', () => folderInput.click());
@@ -31,23 +35,29 @@ async function boot() {
   dropzone.addEventListener('keydown', (event) => {
     if (event.target === dropzone && (event.key === 'Enter' || event.key === ' ')) fileInput.click();
   });
-  for (const event of ['dragenter', 'dragover']) dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
-  for (const event of ['dragleave', 'drop']) dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); });
+
+  for (const event of ['dragenter', 'dragover']) {
+    dropzone.addEventListener(event, (e) => {
+      e.preventDefault();
+      dropzone.classList.add('drag');
+    });
+  }
+  for (const event of ['dragleave', 'drop']) {
+    dropzone.addEventListener(event, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('drag');
+    });
+  }
   dropzone.addEventListener('drop', (event) => inspectFiles([...event.dataTransfer.files]));
 
   $('clean-button').addEventListener('click', cleanSelected);
-  for (const button of document.querySelectorAll('[data-export-format]')) {
-    button.addEventListener('click', () => {
-      exportReport(button.dataset.exportFormat);
-      $('export-menu').open = false;
-    });
-  }
 
   const privacy = $('privacy-details');
-  const exportMenu = $('export-menu');
   document.addEventListener('click', (event) => {
     if (privacy?.open && !privacy.contains(event.target)) privacy.open = false;
-    if (exportMenu?.open && !exportMenu.contains(event.target)) exportMenu.open = false;
+    for (const menu of document.querySelectorAll('.export-menu[open]')) {
+      if (!menu.contains(event.target)) menu.open = false;
+    }
   });
 
   const backToTop = $('back-to-top');
@@ -87,10 +97,13 @@ async function inspectOne(index) {
   const entry = state.entries[index];
   entry.status = 'scanning';
   renderInspection();
+
   try {
     const logicalName = entryName(entry);
     const response = await fetch(`/api/scan?name=${encodeURIComponent(logicalName)}&policy=${encodeURIComponent(state.policy)}`, {
-      method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: entry.file
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: entry.file
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error || `Scan failed (${response.status})`);
@@ -120,6 +133,7 @@ function setViewMode(mode) {
 function renderInspection() {
   const tabs = $('file-tabs');
   tabs.replaceChildren();
+
   const multi = state.entries.length > 1;
   $('view-switch').classList.toggle('hidden', !multi);
   $('view-all').classList.toggle('active', state.viewMode === 'all');
@@ -127,8 +141,8 @@ function renderInspection() {
   $('view-all').setAttribute('aria-pressed', String(state.viewMode === 'all'));
   $('view-file').setAttribute('aria-pressed', String(state.viewMode === 'file'));
 
-  const done = state.entries.filter((entry) => entry.status === 'done').length;
-  $('queue-status').textContent = `${done}/${state.entries.length} inspected`;
+  const completed = state.entries.filter((entry) => entry.status === 'done' || entry.status === 'error').length;
+  $('queue-status').textContent = completed < state.entries.length ? `${completed}/${state.entries.length} inspected` : '';
 
   if (state.viewMode === 'all') {
     tabs.classList.add('hidden');
@@ -136,7 +150,6 @@ function renderInspection() {
   }
 
   tabs.classList.remove('hidden');
-  tabs.classList.toggle('file-list-scroll', state.entries.length > 8);
   state.entries.forEach((entry, index) => {
     const button = document.createElement('button');
     button.className = `file-tab${index === state.selected ? ' active' : ''}${entry.error ? ' error' : ''}`;
@@ -153,7 +166,10 @@ function renderInspection() {
 }
 
 function renderResults() {
-  $('result').classList.remove('hidden');
+  const result = $('result');
+  result.classList.remove('hidden');
+  result.classList.toggle('all-mode', state.viewMode === 'all');
+
   const view = currentView();
   const root = $('findings');
   root.replaceChildren();
@@ -161,7 +177,6 @@ function renderResults() {
   if (!view.reports.length) {
     setSummary(0, 0, 0, 0);
     $('clean-button').classList.add('hidden');
-    $('export-menu').classList.add('hidden');
     $('clean-note').textContent = '';
     root.innerHTML = '<div class="empty">Scanning…</div>';
     return;
@@ -170,7 +185,6 @@ function renderResults() {
   if (view.error) {
     setSummary('—', '—', '—', '—');
     $('clean-button').classList.add('hidden');
-    $('export-menu').classList.add('hidden');
     $('clean-note').textContent = '';
     root.innerHTML = `<div class="finding-row high"><div class="finding-main"><h3>Could not inspect this file</h3><p class="finding-message">${escapeHtml(view.error)}</p></div></div>`;
     return;
@@ -186,10 +200,9 @@ function renderResults() {
   const canClean = state.viewMode === 'file' && removableCount > 0;
   cleanButton.classList.toggle('hidden', !canClean);
   cleanButton.disabled = !canClean;
-  $('export-menu').classList.remove('hidden');
 
   if (state.viewMode === 'all') {
-    $('clean-note').textContent = removableCount > 0 ? 'Switch to By file to create a clean copy for an individual file.' : '';
+    $('clean-note').textContent = '';
   } else {
     $('clean-note').textContent = removableCount > 0
       ? 'Cleaning creates a new copy; the original stays untouched.'
@@ -198,19 +211,20 @@ function renderResults() {
         : '';
   }
 
-  if (findings.length) {
-    const groups = groupFindings(findings);
-    const hasExpandableGroups = groups.some((group) => group.matches.length > 1);
-    const header = document.createElement('div');
-    header.className = 'findings-header';
-    header.innerHTML = `
-      <h2>Findings</h2>
-      <div class="inspection-actions">
-        <span>${findings.length} total</span>
-        ${hasExpandableGroups ? '<button type="button" class="secondary compact findings-toggle">Expand all</button>' : ''}
-      </div>`;
-    root.append(header);
+  const groups = groupFindings(findings);
+  const hasExpandableGroups = groups.some((group) => group.matches.length > 1);
+  const header = document.createElement('div');
+  header.className = 'findings-header';
+  header.innerHTML = `
+    <h2>Findings</h2>
+    <div class="findings-actions">
+      <span>${findings.length} total</span>
+      ${hasExpandableGroups ? '<button type="button" class="secondary compact findings-toggle">Expand all</button>' : ''}
+    </div>`;
+  header.querySelector('.findings-actions').append(createExportMenu());
+  root.append(header);
 
+  if (findings.length) {
     const list = document.createElement('div');
     list.className = 'finding-list';
     for (const group of groups) list.append(renderFindingGroup(group, view.currentPath));
@@ -240,6 +254,26 @@ function renderResults() {
   if (details.length) root.append(renderInspectionDetails(details));
 }
 
+function createExportMenu() {
+  const menu = document.createElement('details');
+  menu.className = 'export-menu';
+  menu.innerHTML = `
+    <summary>Export report</summary>
+    <div class="export-options">
+      <button type="button" data-export-format="html">HTML</button>
+      <button type="button" data-export-format="csv">CSV</button>
+      <button type="button" data-export-format="json">JSON</button>
+    </div>`;
+
+  for (const button of menu.querySelectorAll('[data-export-format]')) {
+    button.addEventListener('click', () => {
+      exportReport(button.dataset.exportFormat);
+      menu.open = false;
+    });
+  }
+  return menu;
+}
+
 function currentView() {
   if (state.viewMode === 'all') {
     const entries = state.entries.filter((entry) => entry.report && !entry.error);
@@ -248,10 +282,10 @@ function currentView() {
     let itemCount = 0;
 
     for (const entry of entries) {
-      const sourcePath = entryName(entry);
+      const sourceFile = entryName(entry);
       itemCount += entry.report.items?.length || 0;
       for (const item of entry.report.findings || []) {
-        const normalized = item.path ? item : { ...item, path: sourcePath };
+        const normalized = { ...item, sourceFile };
         if (normalized.severity === 'info') details.push(normalized);
         else findings.push(normalized);
       }
@@ -344,10 +378,13 @@ function renderMatchPreview(matches, currentPath) {
 
 function renderMatchRow(item, currentPath) {
   const parts = [];
+  if (item.sourceFile) {
+    parts.push(`<span>File: <code>${escapeHtml(item.sourceFile)}</code></span>`);
+  }
   if (item.evidence !== undefined && item.evidence !== null && String(item.evidence) !== '') {
     parts.push(`<span>Evidence: <code>${escapeHtml(String(item.evidence))}</code></span>`);
   }
-  if (item.path && item.path !== currentPath) {
+  if (item.path && item.path !== currentPath && item.path !== item.sourceFile) {
     parts.push(`<span>Path: <code>${escapeHtml(item.path)}</code></span>`);
   }
   return parts.length ? `<div class="match-row">${parts.join('')}</div>` : '';
@@ -397,22 +434,28 @@ function isRedundantMessage(title, message) {
 async function cleanSelected() {
   const entry = state.entries[state.selected];
   if (!entry?.file || state.viewMode !== 'file') return;
+
   $('clean-button').disabled = true;
   $('clean-note').textContent = 'Creating and verifying clean copy…';
   try {
     const response = await fetch(`/api/clean?name=${encodeURIComponent(entry.file.name)}&policy=${encodeURIComponent(state.policy)}`, {
-      method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: entry.file
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: entry.file
     });
     if (!response.ok) {
       const body = await response.json();
       throw new Error(body.error || 'Clean failed');
     }
+
     const findingsAfter = response.headers.get('x-kalypt-findings-after');
     const blob = await response.blob();
     const disposition = response.headers.get('content-disposition') || '';
     const name = disposition.match(/filename="([^"]+)"/)?.[1] || `cleaned-${entry.file.name}`;
     download(blob, name);
-    $('clean-note').textContent = findingsAfter === null ? `Created ${name}.` : `Created ${name}. Verification found ${findingsAfter} remaining finding(s) under the ${state.policy} policy.`;
+    $('clean-note').textContent = findingsAfter === null
+      ? `Created ${name}.`
+      : `Created ${name}. Verification found ${findingsAfter} remaining finding(s) under the ${state.policy} policy.`;
   } catch (error) {
     $('clean-note').textContent = error.message;
   } finally {
@@ -447,7 +490,7 @@ function exportReport(format) {
 }
 
 function renderCsv(view) {
-  const header = ['severity', 'title', 'category', 'removable', 'path', 'evidence', 'message'];
+  const header = ['severity', 'title', 'category', 'removable', 'source_file', 'path', 'evidence', 'message'];
   const rows = [header];
   for (const item of [...view.findings, ...view.details]) {
     rows.push([
@@ -455,6 +498,7 @@ function renderCsv(view) {
       item.title,
       item.category,
       item.removable ? 'yes' : 'no',
+      item.sourceFile || (state.viewMode === 'file' ? view.currentPath : ''),
       item.path || '',
       item.evidence ?? '',
       item.message || ''
@@ -472,15 +516,21 @@ function renderHtmlExport(view) {
   const dangerCount = view.findings.filter((item) => item.severity === 'critical' || item.severity === 'high').length;
   const removableCount = view.findings.filter((item) => item.removable).length;
   const scope = state.viewMode === 'all' ? `${view.reports.length} files` : entryName(view.reports[0]);
+
   const rows = groupFindings(view.findings).map((group) => {
     const matches = group.matches.map((item) => {
       const bits = [];
-      if (item.path) bits.push(`<code>${escapeHtml(item.path)}</code>`);
-      if (item.evidence !== undefined && item.evidence !== null && String(item.evidence) !== '') bits.push(`<span>${escapeHtml(String(item.evidence))}</span>`);
+      if (item.sourceFile) bits.push(`File: <code>${escapeHtml(item.sourceFile)}</code>`);
+      if (item.path && item.path !== item.sourceFile) bits.push(`Path: <code>${escapeHtml(item.path)}</code>`);
+      if (item.evidence !== undefined && item.evidence !== null && String(item.evidence) !== '') {
+        bits.push(`Evidence: <span>${escapeHtml(String(item.evidence))}</span>`);
+      }
       return `<li>${bits.join(' — ') || 'Match'}</li>`;
     }).join('');
+
     return `<section class="finding ${escapeHtml(group.severity)}"><h2><span>${escapeHtml(group.severity)}</span> ${escapeHtml(group.title)}</h2>${isRedundantMessage(group.title, group.message) ? '' : `<p>${escapeHtml(group.message)}</p>`}<ul>${matches}</ul></section>`;
   }).join('');
+
   const details = view.details.length
     ? `<section class="details"><h2>Inspection details</h2><ul>${view.details.map((item) => `<li><strong>${escapeHtml(item.title)}</strong>${item.message ? ` — ${escapeHtml(item.message)}` : ''}</li>`).join('')}</ul></section>`
     : '';

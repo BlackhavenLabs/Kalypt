@@ -20,11 +20,11 @@ button.secondary { background: #242a32; color: var(--text); border: 1px solid #3
 button:disabled { opacity: .45; cursor: not-allowed; }
 .shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 44px; }
 .topbar { display: flex; align-items: center; }
-.brand-lockup { display: inline-flex; align-items: center; gap: 13px; }
-.brand-mark { width: 56px; height: 56px; object-fit: contain; }
-.brand-copy { display: grid; gap: 2px; }
-.brand { font-size: 1.7rem; font-weight: 850; letter-spacing: -.035em; line-height: 1; }
-.tagline { color: var(--muted); font-size: .92rem; line-height: 1.2; }
+.brand-lockup { display: inline-flex; align-items: center; gap: 15px; }
+.brand-mark { width: 66px; height: 66px; object-fit: contain; }
+.brand-copy { display: grid; gap: 3px; }
+.brand { font-size: 2rem; font-weight: 850; letter-spacing: -.035em; line-height: 1; }
+.tagline { color: var(--muted); font-size: 1rem; line-height: 1.2; }
 .hero { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 28px; align-items: end; margin: 30px 0 16px; }
 .hero-copy > p { max-width: 790px; margin: 0; color: #bcc3cc; font-size: 1rem; line-height: 1.5; }
 .controls label { color: var(--muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
@@ -83,9 +83,9 @@ select { display: block; min-width: 158px; margin-top: 6px; background: #171b20;
 .empty { padding: 28px 0; color: var(--muted); text-align: center; }
 @media (max-width: 760px) {
   .shell { width: min(100% - 24px, 1120px); padding-top: 16px; }
-  .brand-mark { width: 48px; height: 48px; }
-  .brand { font-size: 1.5rem; }
-  .tagline { font-size: .84rem; }
+  .brand-mark { width: 54px; height: 54px; }
+  .brand { font-size: 1.7rem; }
+  .tagline { font-size: .9rem; }
   .hero { grid-template-columns: 1fr; gap: 12px; margin-top: 22px; }
   .controls { width: 100%; }
   select { width: 100%; }

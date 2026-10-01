@@ -100,8 +100,10 @@ function git(cwd, args) {
 }
 
 function isSensitiveName(value) {
-  const base = value.toLowerCase();
-  return /(^|\/)(\.env(?:\.|$)|id_rsa$|id_ed25519$|credentials(?:\.|$)|secrets?(?:\.|$)|\.npmrc$|\.pypirc$)/.test(base);
+  const normalized = value.toLowerCase().replace(/\\/g, '/');
+  const filename = path.posix.basename(normalized);
+  if (/^\.env(?:\.|$)/.test(filename)) return true;
+  return /^(?:id_rsa|id_ed25519|credentials(?:\.(?:json|ini|ya?ml|toml|txt))?|secrets?(?:\.(?:json|ini|ya?ml|toml|txt))?|\.npmrc|\.pypirc)$/.test(filename);
 }
 
 function unique(values) {

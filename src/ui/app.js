@@ -31,6 +31,11 @@ async function boot() {
   dropzone.addEventListener('drop', (event) => inspectFiles([...event.dataTransfer.files]));
   $('clean-button').addEventListener('click', cleanSelected);
   $('export-button').addEventListener('click', exportSelected);
+
+  const privacy = $('privacy-details');
+  document.addEventListener('click', (event) => {
+    if (privacy?.open && !privacy.contains(event.target)) privacy.open = false;
+  });
 }
 
 async function inspectFiles(files) {
@@ -95,7 +100,7 @@ function renderSelected() {
   if (!entry) return;
   $('result').classList.remove('hidden');
   if (entry.error) {
-    $('findings').innerHTML = `<div class="finding high"><h3>Could not inspect this file</h3><p>${escapeHtml(entry.error)}</p></div>`;
+    $('findings').innerHTML = `<div class="finding-row high"><div class="finding-main"><h3>Could not inspect this file</h3><p class="finding-message">${escapeHtml(entry.error)}</p></div></div>`;
     for (const id of ['total-count', 'danger-count', 'removable-count', 'item-count']) $(id).textContent = '—';
     $('clean-button').disabled = true;
     return;
@@ -104,6 +109,7 @@ function renderSelected() {
     $('findings').innerHTML = '<div class="empty">Scanning…</div>';
     return;
   }
+
   const report = entry.report;
   $('total-count').textContent = report.summary.total;
   $('danger-count').textContent = report.summary.counts.critical + report.summary.counts.high;
@@ -111,6 +117,7 @@ function renderSelected() {
   $('item-count').textContent = report.items.length;
   $('clean-button').disabled = !report.findings.some((f) => f.removable);
   $('clean-note').textContent = $('clean-button').disabled ? 'No safe built-in cleaner is available for the current findings.' : 'Cleaning creates a new copy; the original stays untouched.';
+
   const root = $('findings');
   root.replaceChildren();
   if (!report.findings.length) {
@@ -123,7 +130,10 @@ function renderSelected() {
   header.innerHTML = `<h2>Findings</h2><span>${report.summary.total} total</span>`;
   root.append(header);
 
-  for (const group of groupFindings(report.findings)) root.append(renderFindingGroup(group));
+  const list = document.createElement('div');
+  list.className = 'finding-list';
+  for (const group of groupFindings(report.findings)) list.append(renderFindingGroup(group));
+  root.append(list);
 }
 
 function groupFindings(findings) {
@@ -132,9 +142,7 @@ function groupFindings(findings) {
     const key = JSON.stringify([
       item.severity,
       item.title,
-      item.message,
       item.category,
-      item.path || '',
       Boolean(item.removable)
     ]);
     if (!groups.has(key)) groups.set(key, { ...item, matches: [] });
@@ -144,41 +152,66 @@ function groupFindings(findings) {
 }
 
 function renderFindingGroup(group) {
-  const article = document.createElement('article');
-  article.className = `finding ${group.severity}`;
+  const row = document.createElement('article');
+  row.className = `finding-row ${group.severity}`;
   const count = group.matches.length;
   const clean = group.removable ? '<span class="cleanable">Removable</span>' : '';
-  const matchLabel = `${count} ${count === 1 ? 'match' : 'matches'}`;
-  const evidence = group.matches
-    .map((item) => item.evidence)
-    .filter((value) => value !== undefined && value !== null && String(value) !== '');
+  const showMessage = !isRedundantMessage(group.title, group.message);
 
-  article.innerHTML = `
-    <div class="finding-summary">
-      <div class="finding-head"><span class="pill">${escapeHtml(group.severity)}</span><h3>${escapeHtml(group.title)}</h3></div>
-      <span class="match-count">${matchLabel}</span>
+  row.innerHTML = `
+    <div class="finding-main">
+      <div class="finding-head">
+        <span class="pill">${escapeHtml(group.severity)}</span>
+        <h3>${escapeHtml(group.title)}</h3>
+      </div>
+      ${showMessage ? `<p class="finding-message">${escapeHtml(group.message)}</p>` : ''}
+      <div class="finding-meta"><code>${escapeHtml(group.category)}</code>${clean}</div>
+      ${renderMatchPreview(group.matches)}
     </div>
-    <p>${escapeHtml(group.message)}</p>
-    <div class="finding-meta-row">
-      <span><code>${escapeHtml(group.category)}</code> ${clean}</span>
-      ${group.path ? `<span class="finding-path">Path: <code>${escapeHtml(group.path)}</code></span>` : ''}
-    </div>
-    ${renderEvidence(evidence)}`;
-  return article;
+    <span class="finding-count">${count} ${count === 1 ? 'match' : 'matches'}</span>`;
+  return row;
 }
 
-function renderEvidence(evidence) {
-  if (!evidence.length) return '';
-  if (evidence.length === 1) {
-    return `<div class="evidence-inline">Evidence: <code>${escapeHtml(String(evidence[0]))}</code></div>`;
-  }
+function renderMatchPreview(matches) {
+  const previewCount = Math.min(3, matches.length);
+  const preview = matches.slice(0, previewCount).map(renderMatchRow).join('');
+  if (matches.length <= previewCount) return `<div class="match-preview">${preview}</div>`;
+  const remaining = matches.slice(previewCount).map(renderMatchRow).join('');
   return `
-    <details class="match-details">
-      <summary>Show matches (${evidence.length})</summary>
-      <div class="match-list">
-        ${evidence.map((value) => `<code>${escapeHtml(String(value))}</code>`).join('')}
-      </div>
+    <div class="match-preview">${preview}</div>
+    <details class="more-details">
+      <summary>+${matches.length - previewCount} more</summary>
+      <div class="more-list">${remaining}</div>
     </details>`;
+}
+
+function renderMatchRow(item) {
+  const path = item.path ? `<span>Path: <code>${escapeHtml(item.path)}</code></span>` : '<span></span>';
+  const evidence = item.evidence !== undefined && item.evidence !== null && String(item.evidence) !== ''
+    ? `<span>Evidence: <code>${escapeHtml(String(item.evidence))}</code></span>`
+    : '<span></span>';
+  return `<div class="match-row">${evidence}${path}</div>`;
+}
+
+function isRedundantMessage(title, message) {
+  const text = String(message || '').trim();
+  if (!text) return true;
+  const normalized = text.toLowerCase();
+  const redundantPatterns = [
+    /^the image contains .* metadata\.?$/,
+    /^the jpeg contains an embedded comment\.?$/,
+    /^the image identifies the device used to capture it\.?$/,
+    /^the image identifies software used to create or edit it\.?$/,
+    /^the image contains an embedded date\/time\.?$/,
+    /^an email address is embedded in the content\.?$/
+  ];
+  if (redundantPatterns.some((pattern) => pattern.test(normalized))) return true;
+
+  const titleWords = new Set(String(title || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((word) => word.length > 3));
+  const messageWords = new Set(normalized.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((word) => word.length > 3));
+  if (!titleWords.size || !messageWords.size) return false;
+  const overlap = [...titleWords].filter((word) => messageWords.has(word)).length;
+  return overlap / titleWords.size >= 0.75 && messageWords.size <= titleWords.size + 4;
 }
 
 async function cleanSelected() {

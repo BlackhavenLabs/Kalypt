@@ -11,13 +11,15 @@
     <header class="topbar">
       <div class="brand-lockup">
         <img class="brand-mark" src="/brand-symbol.webp" alt="" aria-hidden="true">
-        <div class="brand">Kalypt</div>
+        <div class="brand-copy">
+          <div class="brand">Kalypt</div>
+          <div class="tagline">See what you're really sharing.</div>
+        </div>
       </div>
     </header>
 
     <section class="hero">
       <div class="hero-copy">
-        <h1>See what you're really sharing.</h1>
         <p>Kalypt checks files locally for metadata, hidden content, credentials, identity residue, embedded objects, and other things that can hitch a ride when you share them.</p>
       </div>
       <div class="controls">
@@ -39,7 +41,7 @@
       <input id="folder-input" type="file" webkitdirectory multiple hidden>
       <div class="privacy-line">
         <span>Your files and scan results never leave your device.</span>
-        <details class="privacy-details">
+        <details id="privacy-details" class="privacy-details">
           <summary>Technical details</summary>
           <div>Kalypt runs locally on your device. The interface connects only to the local Kalypt service at <code>127.0.0.1</code>; file contents and scan results are not sent to a remote server.</div>
         </details>

@@ -135,28 +135,28 @@ function renderInspection() {
   tabs.replaceChildren();
 
   const multi = state.entries.length > 1;
+  const allMode = state.viewMode === 'all';
   $('view-switch').classList.toggle('hidden', !multi);
-  $('view-all').classList.toggle('active', state.viewMode === 'all');
-  $('view-file').classList.toggle('active', state.viewMode === 'file');
-  $('view-all').setAttribute('aria-pressed', String(state.viewMode === 'all'));
-  $('view-file').setAttribute('aria-pressed', String(state.viewMode === 'file'));
+  $('view-all').classList.toggle('active', allMode);
+  $('view-file').classList.toggle('active', !allMode);
+  $('view-all').setAttribute('aria-pressed', String(allMode));
+  $('view-file').setAttribute('aria-pressed', String(!allMode));
 
   const completed = state.entries.filter((entry) => entry.status === 'done' || entry.status === 'error').length;
   $('queue-status').textContent = completed < state.entries.length ? `${completed}/${state.entries.length} inspected` : '';
 
-  if (state.viewMode === 'all') {
-    tabs.classList.add('hidden');
-    return;
-  }
-
   tabs.classList.remove('hidden');
+  tabs.classList.toggle('muted', allMode);
   state.entries.forEach((entry, index) => {
     const button = document.createElement('button');
     button.className = `file-tab${index === state.selected ? ' active' : ''}${entry.error ? ' error' : ''}`;
     const prefix = entry.status === 'scanning' ? 'Scanning · ' : entry.error ? 'Error · ' : '';
     button.textContent = `${prefix}${entryName(entry)}`;
     button.title = button.textContent;
+    button.disabled = allMode;
+    button.setAttribute('aria-disabled', String(allMode));
     button.addEventListener('click', () => {
+      if (allMode) return;
       state.selected = index;
       renderInspection();
       renderResults();
@@ -198,8 +198,13 @@ function renderResults() {
 
   const cleanButton = $('clean-button');
   const canClean = state.viewMode === 'file' && removableCount > 0;
-  cleanButton.classList.toggle('hidden', !canClean);
+  cleanButton.classList.remove('hidden');
   cleanButton.disabled = !canClean;
+  cleanButton.title = state.viewMode === 'all'
+    ? 'Switch to By file to create a clean copy.'
+    : removableCount > 0
+      ? ''
+      : 'No safe built-in cleaner is available for the current findings.';
 
   if (state.viewMode === 'all') {
     $('clean-note').textContent = '';

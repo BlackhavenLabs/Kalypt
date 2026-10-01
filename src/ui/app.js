@@ -161,15 +161,37 @@ function renderSelected() {
   root.replaceChildren();
 
   if (findings.length) {
+    const groups = groupFindings(findings);
+    const hasExpandableGroups = groups.some((group) => group.matches.length > 1);
     const header = document.createElement('div');
     header.className = 'findings-header';
-    header.innerHTML = `<h2>Findings</h2><span>${findings.length} total</span>`;
+    header.innerHTML = `
+      <h2>Findings</h2>
+      <div class="inspection-actions">
+        <span>${findings.length} total</span>
+        ${hasExpandableGroups ? '<button type="button" class="secondary compact findings-toggle">Expand all</button>' : ''}
+      </div>`;
     root.append(header);
 
     const list = document.createElement('div');
     list.className = 'finding-list';
-    for (const group of groupFindings(findings)) list.append(renderFindingGroup(group, currentPath));
+    for (const group of groups) list.append(renderFindingGroup(group, currentPath));
     root.append(list);
+
+    const toggle = header.querySelector('.findings-toggle');
+    if (toggle) {
+      const expanders = [...list.querySelectorAll('details.more-details')];
+      const syncToggle = () => {
+        toggle.textContent = expanders.every((details) => details.open) ? 'Collapse all' : 'Expand all';
+      };
+      toggle.addEventListener('click', () => {
+        const shouldOpen = !expanders.every((details) => details.open);
+        for (const details of expanders) details.open = shouldOpen;
+        syncToggle();
+      });
+      for (const details of expanders) details.addEventListener('toggle', syncToggle);
+      syncToggle();
+    }
   } else {
     const clear = document.createElement('div');
     clear.className = 'clear-state';

@@ -1,0 +1,27 @@
+name: Kalypt share-safety scan
+description: Inspect source before publication for secrets, local paths, sensitive tracked files, and repository residue.
+inputs:
+  target:
+    description: File or directory to inspect
+    required: false
+    default: .
+  policy:
+    description: Kalypt policy profile
+    required: false
+    default: source-release
+  fail-on:
+    description: Minimum severity that fails the action
+    required: false
+    default: high
+  sarif-output:
+    description: SARIF output path
+    required: false
+    default: kalypt-results.sarif
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: node "$GITHUB_ACTION_PATH/bin/kalypt.js" scan "${{ inputs.target }}" --policy "${{ inputs.policy }}" --git-tracked-only --format sarif --output "${{ inputs.sarif-output }}" --fail-on "${{ inputs.fail-on }}" --no-color
+branding:
+  icon: search
+  color: blue

@@ -175,6 +175,7 @@ That last command is Kalypt checking its own repository with the same source-rel
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Plugins](docs/PLUGINS.md)
+- [Privacy](PRIVACY.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { writeZip } from '../src/formats/zip.js';
 import { scanTarget } from '../src/scan.js';
+import { inspectGitRepository } from '../src/inspectors/git.js';
 import { cleanFile } from '../src/clean/index.js';
 import { applyPolicy } from '../src/policy.js';
 import { writeBaseline, loadBaseline, applyBaseline } from '../src/baseline.js';
@@ -134,4 +135,19 @@ test('finding fingerprints are portable across checkout paths', async () => {
   const fa = ra.findings.find((f) => f.category === 'identity.local-path');
   const fb = rb.findings.find((f) => f.category === 'identity.local-path');
   assert.equal(fa.id, fb.id);
+});
+
+test('tracked secret detector does not flag source files named secrets.js', async (t) => {
+  if (spawnSync('git', ['--version']).status !== 0) return t.skip('git unavailable');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'kalypt-sensitive-name-'));
+  const run = (args) => spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+  run(['init']);
+  await fs.mkdir(path.join(dir, 'src'));
+  await fs.writeFile(path.join(dir, 'src', 'secrets.js'), 'export const detector = true;\n');
+  await fs.writeFile(path.join(dir, 'credentials.json'), '{"example":true}\n');
+  run(['add', '.']);
+
+  const findings = inspectGitRepository(dir).filter((f) => f.category === 'git.sensitive-file-tracked');
+  assert.equal(findings.some((f) => f.path === 'src/secrets.js'), false);
+  assert.equal(findings.some((f) => f.path === 'credentials.json'), true);
 });

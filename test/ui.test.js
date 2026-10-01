@@ -13,7 +13,7 @@ test('local UI serves the app and scans raw file bytes', async (t) => {
   t.after(() => new Promise((resolve) => app.server.close(resolve)));
   const home = await fetch(app.url);
   assert.equal(home.status, 200);
-  assert.match(await home.text(), /Drop something before you send it/i);
+  assert.match(await home.text(), /See what you're really sharing/i);
   const scan = await fetch(`${app.url}api/scan?name=config.txt&policy=source-release`, {
     method: 'POST',
     headers: { 'content-type': 'application/octet-stream' },

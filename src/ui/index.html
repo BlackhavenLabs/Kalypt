@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kalypt — see what you're really sharing</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <img class="brand-mark" src="/brand-symbol.png" alt="" aria-hidden="true">
+        <div>
+          <div class="brand">Kalypt</div>
+          <div class="tagline">See what you're really sharing.</div>
+        </div>
+      </div>
+      <div class="local-badge"><span></span> Local only</div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">INSPECT · EXPLAIN · CLEAN</p>
+        <h1>Drop something before you send it.</h1>
+        <p>Kalypt checks files locally for metadata, hidden content, credentials, identity residue, embedded objects, and other things that can hitch a ride when you share them.</p>
+      </div>
+      <div class="controls">
+        <label>Policy
+          <select id="policy"></select>
+        </label>
+      </div>
+    </section>
+
+    <section id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Choose files to inspect">
+      <div class="drop-icon">↓</div>
+      <strong>Drop files here</strong>
+      <span>or choose files / a folder</span>
+      <div class="chooser-row">
+        <button id="choose-files" type="button">Choose files</button>
+        <button id="choose-folder" type="button" class="secondary">Choose folder</button>
+      </div>
+      <input id="file-input" type="file" multiple hidden>
+      <input id="folder-input" type="file" webkitdirectory multiple hidden>
+      <small>Nothing leaves this computer. The UI talks only to <code>127.0.0.1</code>.</small>
+    </section>
+
+    <section id="queue" class="queue hidden">
+      <div class="section-title"><h2>Inspection</h2><span id="queue-status"></span></div>
+      <div id="file-tabs" class="file-tabs"></div>
+    </section>
+
+    <section id="result" class="result hidden">
+      <div class="summary-grid">
+        <div class="summary-card"><span>Findings</span><strong id="total-count">0</strong></div>
+        <div class="summary-card danger"><span>Critical / High</span><strong id="danger-count">0</strong></div>
+        <div class="summary-card"><span>Removable</span><strong id="removable-count">0</strong></div>
+        <div class="summary-card"><span>Items inspected</span><strong id="item-count">0</strong></div>
+      </div>
+      <div class="result-actions">
+        <button id="clean-button" type="button">Create clean copy</button>
+        <button id="export-button" type="button" class="secondary">Export JSON</button>
+      </div>
+      <div id="clean-note" class="note"></div>
+      <div id="findings" class="findings"></div>
+    </section>
+  </main>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

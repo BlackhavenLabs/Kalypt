@@ -14,7 +14,9 @@ export async function startUi({ port = 0, open = true } = {}) {
   const assets = {
     '/': ['index.html', 'text/html; charset=utf-8'],
     '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
+    '/view-controls.js': ['view-controls.js', 'text/javascript; charset=utf-8'],
     '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
+    '/view-controls.css': ['view-controls.css', 'text/css; charset=utf-8'],
     '/brand-symbol.webp': ['brand-symbol.webp', 'image/webp']
   };
   const server = http.createServer(async (req, res) => {

@@ -14,3 +14,4 @@ First public Kalypt codebase.
 - Text, JSON, Markdown, HTML, and SARIF reports
 - Local drag-and-drop UI
 - Git pre-push hook, composite GitHub Action, and explicit plugin API
+- Licensed under GNU GPL v3.0 only (`GPL-3.0-only`)

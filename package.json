@@ -37,7 +37,7 @@
     "local-first"
   ],
   "author": "Blackhaven Labs",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "files": [
     "bin",
     "src",

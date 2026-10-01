@@ -35,3 +35,7 @@ A cleaner must write a separate output, preserve the primary payload as much as 
 ## Dependencies
 
 A new runtime dependency should solve a real problem, have a compatible license, and come from a maintained upstream. For large or specialized capabilities, an optional adapter may be a better fit than adding the dependency to core.
+
+## Licensing
+
+By submitting a contribution, you agree that your contribution may be distributed under the GNU General Public License v3.0 only (`GPL-3.0-only`).

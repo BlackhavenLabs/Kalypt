@@ -181,4 +181,4 @@ That last command is Kalypt checking its own repository with the same source-rel
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Kalypt is licensed under the **GNU General Public License v3.0 only** (`GPL-3.0-only`). Copyright © 2026 Blackhaven Labs and Kalypt contributors. See [LICENSE](LICENSE).

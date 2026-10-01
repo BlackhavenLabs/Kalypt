@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node ./bin/kalypt.js",
-    "ui": "node ./bin/kalypt.js ui --no-open",
+    "ui": "node ./bin/kalypt.js ui",
     "test": "node --test",
     "lint": "node ./scripts/lint.js",
     "check": "npm run lint && npm test",

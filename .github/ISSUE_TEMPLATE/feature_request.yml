@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a file format, detector, cleaner, integration, or workflow.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: A concrete sharing or inspection scenario is more useful than a feature name by itself.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like Kalypt to do?
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or references
+      description: File-format docs, existing tools, or synthetic samples are welcome.

@@ -1,4 +1,4 @@
-const state = { entries: [], selected: 0, policy: 'public' };
+const state = { entries: [], selected: 0, policy: 'public', appendNext: false };
 const $ = (id) => document.getElementById(id);
 const dropzone = $('dropzone');
 const fileInput = $('file-input');
@@ -16,19 +16,24 @@ async function boot() {
   }
   $('policy').value = state.policy;
   $('policy').addEventListener('change', () => { state.policy = $('policy').value; rescanAll(); });
-  $('choose-files').addEventListener('click', () => fileInput.click());
-  $('choose-folder').addEventListener('click', () => folderInput.click());
-  fileInput.addEventListener('change', () => inspectFiles([...fileInput.files]));
-  folderInput.addEventListener('change', () => inspectFiles([...folderInput.files]));
+
+  $('choose-files').addEventListener('click', () => openPicker(fileInput, false));
+  $('choose-folder').addEventListener('click', () => openPicker(folderInput, false));
+  $('add-files').addEventListener('click', () => openPicker(fileInput, true));
+  $('add-folder').addEventListener('click', () => openPicker(folderInput, true));
+  fileInput.addEventListener('change', () => consumePicker(fileInput));
+  folderInput.addEventListener('change', () => consumePicker(folderInput));
+
   dropzone.addEventListener('click', (event) => {
-    if (event.target === dropzone || event.target.closest('.drop-icon')) fileInput.click();
+    if (event.target === dropzone) openPicker(fileInput, false);
   });
   dropzone.addEventListener('keydown', (event) => {
-    if (event.target === dropzone && (event.key === 'Enter' || event.key === ' ')) fileInput.click();
+    if (event.target === dropzone && (event.key === 'Enter' || event.key === ' ')) openPicker(fileInput, false);
   });
   for (const event of ['dragenter', 'dragover']) dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
   for (const event of ['dragleave', 'drop']) dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); });
-  dropzone.addEventListener('drop', (event) => inspectFiles([...event.dataTransfer.files]));
+  dropzone.addEventListener('drop', (event) => inspectFiles([...event.dataTransfer.files], { append: state.entries.length > 0 }));
+
   $('clean-button').addEventListener('click', cleanSelected);
   $('export-button').addEventListener('click', exportSelected);
 
@@ -38,14 +43,34 @@ async function boot() {
   });
 }
 
-async function inspectFiles(files) {
+function openPicker(input, append) {
+  state.appendNext = append;
+  input.click();
+}
+
+function consumePicker(input) {
+  const files = [...input.files];
+  const append = state.appendNext;
+  state.appendNext = false;
+  input.value = '';
+  inspectFiles(files, { append });
+}
+
+async function inspectFiles(files, { append = false } = {}) {
   if (!files.length) return;
-  state.entries = files.map((file) => ({ file, report: null, error: null, status: 'queued' }));
-  state.selected = 0;
+
+  const newEntries = files.map((file) => ({ file, report: null, error: null, status: 'queued' }));
+  const startIndex = append ? state.entries.length : 0;
+
+  if (append) state.entries.push(...newEntries);
+  else state.entries = newEntries;
+
+  state.selected = startIndex;
   $('queue').classList.remove('hidden');
-  $('result').classList.add('hidden');
+  if (!append) $('result').classList.add('hidden');
   renderTabs();
-  for (let i = 0; i < state.entries.length; i += 1) {
+
+  for (let i = startIndex; i < state.entries.length; i += 1) {
     await inspectOne(i);
     renderTabs();
     if (i === state.selected) renderSelected();
@@ -99,6 +124,7 @@ function renderSelected() {
   const entry = state.entries[state.selected];
   if (!entry) return;
   $('result').classList.remove('hidden');
+
   if (entry.error) {
     $('findings').innerHTML = `<div class="finding-row high"><div class="finding-main"><h3>Could not inspect this file</h3><p class="finding-message">${escapeHtml(entry.error)}</p></div></div>`;
     for (const id of ['total-count', 'danger-count', 'removable-count', 'item-count']) $(id).textContent = '—';
@@ -111,29 +137,47 @@ function renderSelected() {
   }
 
   const report = entry.report;
-  $('total-count').textContent = report.summary.total;
-  $('danger-count').textContent = report.summary.counts.critical + report.summary.counts.high;
-  $('removable-count').textContent = report.summary.removable;
+  const currentPath = entry.file.webkitRelativePath || entry.file.name;
+  const findings = report.findings.filter((item) => item.severity !== 'info');
+  const details = report.findings.filter((item) => item.severity === 'info');
+  const dangerCount = findings.filter((item) => item.severity === 'critical' || item.severity === 'high').length;
+  const removableCount = findings.filter((item) => item.removable).length;
+
+  $('total-count').textContent = findings.length;
+  $('danger-count').textContent = dangerCount;
+  $('removable-count').textContent = removableCount;
   $('item-count').textContent = report.items.length;
-  $('clean-button').disabled = !report.findings.some((f) => f.removable);
-  $('clean-note').textContent = $('clean-button').disabled ? 'No safe built-in cleaner is available for the current findings.' : 'Cleaning creates a new copy; the original stays untouched.';
+
+  const cleanButton = $('clean-button');
+  cleanButton.disabled = removableCount === 0;
+  cleanButton.classList.toggle('hidden', removableCount === 0);
+  $('clean-note').textContent = removableCount > 0
+    ? 'Cleaning creates a new copy; the original stays untouched.'
+    : findings.length > 0
+      ? 'No safe built-in cleaner is available for the current findings.'
+      : '';
 
   const root = $('findings');
   root.replaceChildren();
-  if (!report.findings.length) {
-    root.innerHTML = '<div class="empty">No findings under this policy.</div>';
-    return;
+
+  if (findings.length) {
+    const header = document.createElement('div');
+    header.className = 'findings-header';
+    header.innerHTML = `<h2>Findings</h2><span>${findings.length} total</span>`;
+    root.append(header);
+
+    const list = document.createElement('div');
+    list.className = 'finding-list';
+    for (const group of groupFindings(findings)) list.append(renderFindingGroup(group, currentPath));
+    root.append(list);
+  } else {
+    const clear = document.createElement('div');
+    clear.className = 'clear-state';
+    clear.innerHTML = '<strong>No findings</strong><span>Nothing requiring review under this policy.</span>';
+    root.append(clear);
   }
 
-  const header = document.createElement('div');
-  header.className = 'findings-header';
-  header.innerHTML = `<h2>Findings</h2><span>${report.summary.total} total</span>`;
-  root.append(header);
-
-  const list = document.createElement('div');
-  list.className = 'finding-list';
-  for (const group of groupFindings(report.findings)) list.append(renderFindingGroup(group));
-  root.append(list);
+  if (details.length) root.append(renderInspectionDetails(details));
 }
 
 function groupFindings(findings) {
@@ -158,7 +202,7 @@ function groupFindings(findings) {
   });
 }
 
-function renderFindingGroup(group) {
+function renderFindingGroup(group, currentPath) {
   const row = document.createElement('article');
   row.className = `finding-row ${group.severity}`;
   const count = group.matches.length;
@@ -170,35 +214,58 @@ function renderFindingGroup(group) {
       <div class="finding-head">
         <span class="pill">${escapeHtml(group.severity)}</span>
         <h3>${escapeHtml(group.title)}</h3>
+        ${clean}
       </div>
       ${showMessage ? `<p class="finding-message">${escapeHtml(group.message)}</p>` : ''}
-      <div class="finding-meta"><code>${escapeHtml(group.category)}</code>${clean}</div>
-      ${renderMatchPreview(group.matches)}
+      ${renderMatchPreview(group.matches, currentPath)}
     </div>
     <span class="finding-count">${count} ${count === 1 ? 'match' : 'matches'}</span>`;
   return row;
 }
 
-function renderMatchPreview(matches) {
+function renderMatchPreview(matches, currentPath) {
   if (!matches.length) return '';
-  const first = renderMatchRow(matches[0]);
-  if (matches.length === 1) return `<div class="match-preview">${first}</div>`;
+  const first = renderMatchRow(matches[0], currentPath);
+  const preview = first ? `<div class="match-preview">${first}</div>` : '';
+  if (matches.length === 1) return preview;
 
-  const remaining = matches.slice(1).map(renderMatchRow).join('');
+  const remaining = matches.slice(1).map((item) => renderMatchRow(item, currentPath)).filter(Boolean).join('');
   return `
-    <div class="match-preview">${first}</div>
+    ${preview}
     <details class="more-details">
       <summary>Show ${matches.length - 1} more</summary>
-      <div class="more-list">${remaining}</div>
+      ${remaining ? `<div class="more-list">${remaining}</div>` : ''}
     </details>`;
 }
 
-function renderMatchRow(item) {
-  const path = item.path ? `<span>Path: <code>${escapeHtml(item.path)}</code></span>` : '<span></span>';
-  const evidence = item.evidence !== undefined && item.evidence !== null && String(item.evidence) !== ''
-    ? `<span>Evidence: <code>${escapeHtml(String(item.evidence))}</code></span>`
-    : '<span></span>';
-  return `<div class="match-row">${evidence}${path}</div>`;
+function renderMatchRow(item, currentPath) {
+  const parts = [];
+  if (item.evidence !== undefined && item.evidence !== null && String(item.evidence) !== '') {
+    parts.push(`<span>Evidence: <code>${escapeHtml(String(item.evidence))}</code></span>`);
+  }
+  if (item.path && item.path !== currentPath) {
+    parts.push(`<span>Path: <code>${escapeHtml(item.path)}</code></span>`);
+  }
+  return parts.length ? `<div class="match-row">${parts.join('')}</div>` : '';
+}
+
+function renderInspectionDetails(details) {
+  const groups = groupFindings(details);
+  const wrapper = document.createElement('details');
+  wrapper.className = 'inspection-details';
+  wrapper.innerHTML = `<summary>Inspection details <span>${details.length}</span></summary>`;
+
+  const list = document.createElement('div');
+  list.className = 'inspection-detail-list';
+  for (const group of groups) {
+    const row = document.createElement('div');
+    row.className = 'inspection-detail-row';
+    const message = isRedundantMessage(group.title, group.message) ? '' : group.message;
+    row.innerHTML = `<strong>${escapeHtml(group.title)}</strong>${message ? `<span>${escapeHtml(message)}</span>` : ''}${group.matches.length > 1 ? `<em>${group.matches.length} matches</em>` : ''}`;
+    list.append(row);
+  }
+  wrapper.append(list);
+  return wrapper;
 }
 
 function isRedundantMessage(title, message) {
@@ -206,6 +273,7 @@ function isRedundantMessage(title, message) {
   if (!text) return true;
   const normalized = text.toLowerCase();
   const redundantPatterns = [
+    /^potential secret material is present and should be reviewed before sharing\.?$/,
     /^the image contains .* metadata\.?$/,
     /^the jpeg contains an embedded comment\.?$/,
     /^the image identifies the device used to capture it\.?$/,
@@ -257,7 +325,9 @@ function exportSelected() {
 function download(blob, name) {
   const href = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = href; a.download = name; a.click();
+  a.href = href;
+  a.download = name;
+  a.click();
   setTimeout(() => URL.revokeObjectURL(href), 1000);
 }
 

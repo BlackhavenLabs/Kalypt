@@ -30,7 +30,6 @@
     </section>
 
     <section id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Choose files to inspect">
-      <div class="drop-icon">↓</div>
       <strong>Drop files here</strong>
       <span>or choose files / a folder</span>
       <div class="chooser-row">
@@ -49,7 +48,14 @@
     </section>
 
     <section id="queue" class="queue hidden">
-      <div class="section-title"><h2>Inspection</h2><span id="queue-status"></span></div>
+      <div class="section-title">
+        <h2>Inspection</h2>
+        <div class="inspection-actions">
+          <span id="queue-status"></span>
+          <button id="add-files" type="button" class="compact secondary">Add files</button>
+          <button id="add-folder" type="button" class="compact secondary">Add folder</button>
+        </div>
+      </div>
       <div id="file-tabs" class="file-tabs"></div>
     </section>
 

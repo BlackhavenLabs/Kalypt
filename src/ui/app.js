@@ -1,4 +1,4 @@
-const state = { entries: [], selected: 0, policy: 'public', appendNext: false };
+const state = { entries: [], selected: 0, policy: 'public' };
 const $ = (id) => document.getElementById(id);
 const dropzone = $('dropzone');
 const fileInput = $('file-input');
@@ -17,22 +17,20 @@ async function boot() {
   $('policy').value = state.policy;
   $('policy').addEventListener('change', () => { state.policy = $('policy').value; rescanAll(); });
 
-  $('choose-files').addEventListener('click', () => openPicker(fileInput, false));
-  $('choose-folder').addEventListener('click', () => openPicker(folderInput, false));
-  $('add-files').addEventListener('click', () => openPicker(fileInput, true));
-  $('add-folder').addEventListener('click', () => openPicker(folderInput, true));
+  $('choose-files').addEventListener('click', () => fileInput.click());
+  $('choose-folder').addEventListener('click', () => folderInput.click());
   fileInput.addEventListener('change', () => consumePicker(fileInput));
   folderInput.addEventListener('change', () => consumePicker(folderInput));
 
   dropzone.addEventListener('click', (event) => {
-    if (event.target === dropzone) openPicker(fileInput, false);
+    if (event.target === dropzone) fileInput.click();
   });
   dropzone.addEventListener('keydown', (event) => {
-    if (event.target === dropzone && (event.key === 'Enter' || event.key === ' ')) openPicker(fileInput, false);
+    if (event.target === dropzone && (event.key === 'Enter' || event.key === ' ')) fileInput.click();
   });
   for (const event of ['dragenter', 'dragover']) dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
   for (const event of ['dragleave', 'drop']) dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); });
-  dropzone.addEventListener('drop', (event) => inspectFiles([...event.dataTransfer.files], { append: state.entries.length > 0 }));
+  dropzone.addEventListener('drop', (event) => inspectFiles([...event.dataTransfer.files]));
 
   $('clean-button').addEventListener('click', cleanSelected);
   $('export-button').addEventListener('click', exportSelected);
@@ -41,36 +39,33 @@ async function boot() {
   document.addEventListener('click', (event) => {
     if (privacy?.open && !privacy.contains(event.target)) privacy.open = false;
   });
-}
 
-function openPicker(input, append) {
-  state.appendNext = append;
-  input.click();
+  const backToTop = $('back-to-top');
+  backToTop.addEventListener('click', () => dropzone.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  const syncBackToTop = () => {
+    backToTop.classList.toggle('hidden', window.scrollY < dropzone.offsetTop + 120);
+  };
+  window.addEventListener('scroll', syncBackToTop, { passive: true });
+  window.addEventListener('resize', syncBackToTop);
+  syncBackToTop();
 }
 
 function consumePicker(input) {
   const files = [...input.files];
-  const append = state.appendNext;
-  state.appendNext = false;
   input.value = '';
-  inspectFiles(files, { append });
+  inspectFiles(files);
 }
 
-async function inspectFiles(files, { append = false } = {}) {
+async function inspectFiles(files) {
   if (!files.length) return;
 
-  const newEntries = files.map((file) => ({ file, report: null, error: null, status: 'queued' }));
-  const startIndex = append ? state.entries.length : 0;
-
-  if (append) state.entries.push(...newEntries);
-  else state.entries = newEntries;
-
-  state.selected = startIndex;
+  state.entries = files.map((file) => ({ file, report: null, error: null, status: 'queued' }));
+  state.selected = 0;
   $('queue').classList.remove('hidden');
-  if (!append) $('result').classList.add('hidden');
+  $('result').classList.add('hidden');
   renderTabs();
 
-  for (let i = startIndex; i < state.entries.length; i += 1) {
+  for (let i = 0; i < state.entries.length; i += 1) {
     await inspectOne(i);
     renderTabs();
     if (i === state.selected) renderSelected();

@@ -102,6 +102,7 @@ async function rescanAll() {
 function renderTabs() {
   const tabs = $('file-tabs');
   tabs.replaceChildren();
+  tabs.classList.toggle('file-list-scroll', state.entries.length > 8);
   const done = state.entries.filter((entry) => entry.status === 'done').length;
   $('queue-status').textContent = `${done}/${state.entries.length} inspected`;
   state.entries.forEach((entry, index) => {

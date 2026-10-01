@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/kalypt-banner.png" alt="Kalypt — See what you're really sharing" width="100%">
+  <img src="assets/brand/kalypt-banner.svg" alt="Kalypt — See what you're really sharing" width="100%">
 </p>
 
 # Kalypt

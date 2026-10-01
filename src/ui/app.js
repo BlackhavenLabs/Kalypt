@@ -1,4 +1,4 @@
-const state = { entries: [], selected: 0, policy: 'public' };
+const state = { entries: [], selected: 0, policy: 'public', viewMode: 'file' };
 const $ = (id) => document.getElementById(id);
 const dropzone = $('dropzone');
 const fileInput = $('file-input');
@@ -22,6 +22,9 @@ async function boot() {
   fileInput.addEventListener('change', () => consumePicker(fileInput));
   folderInput.addEventListener('change', () => consumePicker(folderInput));
 
+  $('view-all').addEventListener('click', () => setViewMode('all'));
+  $('view-file').addEventListener('click', () => setViewMode('file'));
+
   dropzone.addEventListener('click', (event) => {
     if (event.target === dropzone) fileInput.click();
   });
@@ -33,11 +36,18 @@ async function boot() {
   dropzone.addEventListener('drop', (event) => inspectFiles([...event.dataTransfer.files]));
 
   $('clean-button').addEventListener('click', cleanSelected);
-  $('export-button').addEventListener('click', exportSelected);
+  for (const button of document.querySelectorAll('[data-export-format]')) {
+    button.addEventListener('click', () => {
+      exportReport(button.dataset.exportFormat);
+      $('export-menu').open = false;
+    });
+  }
 
   const privacy = $('privacy-details');
+  const exportMenu = $('export-menu');
   document.addEventListener('click', (event) => {
     if (privacy?.open && !privacy.contains(event.target)) privacy.open = false;
+    if (exportMenu?.open && !exportMenu.contains(event.target)) exportMenu.open = false;
   });
 
   const backToTop = $('back-to-top');
@@ -61,23 +71,24 @@ async function inspectFiles(files) {
 
   state.entries = files.map((file) => ({ file, report: null, error: null, status: 'queued' }));
   state.selected = 0;
+  state.viewMode = files.length > 1 ? 'all' : 'file';
   $('queue').classList.remove('hidden');
   $('result').classList.add('hidden');
-  renderTabs();
+  renderInspection();
 
   for (let i = 0; i < state.entries.length; i += 1) {
     await inspectOne(i);
-    renderTabs();
-    if (i === state.selected) renderSelected();
+    renderInspection();
+    if (state.viewMode === 'all' || i === state.selected) renderResults();
   }
 }
 
 async function inspectOne(index) {
   const entry = state.entries[index];
   entry.status = 'scanning';
-  renderTabs();
+  renderInspection();
   try {
-    const logicalName = entry.file.webkitRelativePath || entry.file.name;
+    const logicalName = entryName(entry);
     const response = await fetch(`/api/scan?name=${encodeURIComponent(logicalName)}&policy=${encodeURIComponent(state.policy)}`, {
       method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: entry.file
     });
@@ -95,66 +106,97 @@ async function inspectOne(index) {
 async function rescanAll() {
   if (!state.entries.length) return;
   for (let i = 0; i < state.entries.length; i += 1) await inspectOne(i);
-  renderTabs();
-  renderSelected();
+  renderInspection();
+  renderResults();
 }
 
-function renderTabs() {
+function setViewMode(mode) {
+  if (mode === 'all' && state.entries.length < 2) return;
+  state.viewMode = mode;
+  renderInspection();
+  renderResults();
+}
+
+function renderInspection() {
   const tabs = $('file-tabs');
   tabs.replaceChildren();
-  tabs.classList.toggle('file-list-scroll', state.entries.length > 8);
+  const multi = state.entries.length > 1;
+  $('view-switch').classList.toggle('hidden', !multi);
+  $('view-all').classList.toggle('active', state.viewMode === 'all');
+  $('view-file').classList.toggle('active', state.viewMode === 'file');
+  $('view-all').setAttribute('aria-pressed', String(state.viewMode === 'all'));
+  $('view-file').setAttribute('aria-pressed', String(state.viewMode === 'file'));
+
   const done = state.entries.filter((entry) => entry.status === 'done').length;
   $('queue-status').textContent = `${done}/${state.entries.length} inspected`;
+
+  if (state.viewMode === 'all') {
+    tabs.classList.add('hidden');
+    return;
+  }
+
+  tabs.classList.remove('hidden');
+  tabs.classList.toggle('file-list-scroll', state.entries.length > 8);
   state.entries.forEach((entry, index) => {
     const button = document.createElement('button');
     button.className = `file-tab${index === state.selected ? ' active' : ''}${entry.error ? ' error' : ''}`;
     const prefix = entry.status === 'scanning' ? 'Scanning · ' : entry.error ? 'Error · ' : '';
-    button.textContent = `${prefix}${entry.file.webkitRelativePath || entry.file.name}`;
+    button.textContent = `${prefix}${entryName(entry)}`;
     button.title = button.textContent;
-    button.addEventListener('click', () => { state.selected = index; renderTabs(); renderSelected(); });
+    button.addEventListener('click', () => {
+      state.selected = index;
+      renderInspection();
+      renderResults();
+    });
     tabs.append(button);
   });
 }
 
-function renderSelected() {
-  const entry = state.entries[state.selected];
-  if (!entry) return;
+function renderResults() {
   $('result').classList.remove('hidden');
-
-  if (entry.error) {
-    $('findings').innerHTML = `<div class="finding-row high"><div class="finding-main"><h3>Could not inspect this file</h3><p class="finding-message">${escapeHtml(entry.error)}</p></div></div>`;
-    for (const id of ['total-count', 'danger-count', 'removable-count', 'item-count']) $(id).textContent = '—';
-    $('clean-button').disabled = true;
-    return;
-  }
-  if (!entry.report) {
-    $('findings').innerHTML = '<div class="empty">Scanning…</div>';
-    return;
-  }
-
-  const report = entry.report;
-  const currentPath = entry.file.webkitRelativePath || entry.file.name;
-  const findings = report.findings.filter((item) => item.severity !== 'info');
-  const details = report.findings.filter((item) => item.severity === 'info');
-  const dangerCount = findings.filter((item) => item.severity === 'critical' || item.severity === 'high').length;
-  const removableCount = findings.filter((item) => item.removable).length;
-
-  $('total-count').textContent = findings.length;
-  $('danger-count').textContent = dangerCount;
-  $('removable-count').textContent = removableCount;
-  $('item-count').textContent = report.items.length;
-
-  const cleanButton = $('clean-button');
-  cleanButton.disabled = removableCount === 0;
-  cleanButton.classList.toggle('hidden', removableCount === 0);
-  $('clean-note').textContent = removableCount > 0
-    ? 'Cleaning creates a new copy; the original stays untouched.'
-    : findings.length > 0
-      ? 'No safe built-in cleaner is available for the current findings.'
-      : '';
-
+  const view = currentView();
   const root = $('findings');
   root.replaceChildren();
+
+  if (!view.reports.length) {
+    setSummary(0, 0, 0, 0);
+    $('clean-button').classList.add('hidden');
+    $('export-menu').classList.add('hidden');
+    $('clean-note').textContent = '';
+    root.innerHTML = '<div class="empty">Scanning…</div>';
+    return;
+  }
+
+  if (view.error) {
+    setSummary('—', '—', '—', '—');
+    $('clean-button').classList.add('hidden');
+    $('export-menu').classList.add('hidden');
+    $('clean-note').textContent = '';
+    root.innerHTML = `<div class="finding-row high"><div class="finding-main"><h3>Could not inspect this file</h3><p class="finding-message">${escapeHtml(view.error)}</p></div></div>`;
+    return;
+  }
+
+  const findings = view.findings;
+  const details = view.details;
+  const dangerCount = findings.filter((item) => item.severity === 'critical' || item.severity === 'high').length;
+  const removableCount = findings.filter((item) => item.removable).length;
+  setSummary(findings.length, dangerCount, removableCount, view.itemCount);
+
+  const cleanButton = $('clean-button');
+  const canClean = state.viewMode === 'file' && removableCount > 0;
+  cleanButton.classList.toggle('hidden', !canClean);
+  cleanButton.disabled = !canClean;
+  $('export-menu').classList.remove('hidden');
+
+  if (state.viewMode === 'all') {
+    $('clean-note').textContent = removableCount > 0 ? 'Switch to By file to create a clean copy for an individual file.' : '';
+  } else {
+    $('clean-note').textContent = removableCount > 0
+      ? 'Cleaning creates a new copy; the original stays untouched.'
+      : findings.length > 0
+        ? 'No safe built-in cleaner is available for the current findings.'
+        : '';
+  }
 
   if (findings.length) {
     const groups = groupFindings(findings);
@@ -171,21 +213,21 @@ function renderSelected() {
 
     const list = document.createElement('div');
     list.className = 'finding-list';
-    for (const group of groups) list.append(renderFindingGroup(group, currentPath));
+    for (const group of groups) list.append(renderFindingGroup(group, view.currentPath));
     root.append(list);
 
     const toggle = header.querySelector('.findings-toggle');
     if (toggle) {
       const expanders = [...list.querySelectorAll('details.more-details')];
       const syncToggle = () => {
-        toggle.textContent = expanders.every((details) => details.open) ? 'Collapse all' : 'Expand all';
+        toggle.textContent = expanders.every((detailsEl) => detailsEl.open) ? 'Collapse all' : 'Expand all';
       };
       toggle.addEventListener('click', () => {
-        const shouldOpen = !expanders.every((details) => details.open);
-        for (const details of expanders) details.open = shouldOpen;
+        const shouldOpen = !expanders.every((detailsEl) => detailsEl.open);
+        for (const detailsEl of expanders) detailsEl.open = shouldOpen;
         syncToggle();
       });
-      for (const details of expanders) details.addEventListener('toggle', syncToggle);
+      for (const detailsEl of expanders) detailsEl.addEventListener('toggle', syncToggle);
       syncToggle();
     }
   } else {
@@ -196,6 +238,50 @@ function renderSelected() {
   }
 
   if (details.length) root.append(renderInspectionDetails(details));
+}
+
+function currentView() {
+  if (state.viewMode === 'all') {
+    const entries = state.entries.filter((entry) => entry.report && !entry.error);
+    const findings = [];
+    const details = [];
+    let itemCount = 0;
+
+    for (const entry of entries) {
+      const sourcePath = entryName(entry);
+      itemCount += entry.report.items?.length || 0;
+      for (const item of entry.report.findings || []) {
+        const normalized = item.path ? item : { ...item, path: sourcePath };
+        if (normalized.severity === 'info') details.push(normalized);
+        else findings.push(normalized);
+      }
+    }
+
+    return { reports: entries, findings, details, itemCount, currentPath: null, error: null };
+  }
+
+  const entry = state.entries[state.selected];
+  if (!entry) return { reports: [], findings: [], details: [], itemCount: 0, currentPath: null, error: null };
+  if (entry.error) return { reports: [entry], findings: [], details: [], itemCount: 0, currentPath: entryName(entry), error: entry.error };
+  if (!entry.report) return { reports: [], findings: [], details: [], itemCount: 0, currentPath: entryName(entry), error: null };
+
+  const findings = (entry.report.findings || []).filter((item) => item.severity !== 'info');
+  const details = (entry.report.findings || []).filter((item) => item.severity === 'info');
+  return {
+    reports: [entry],
+    findings,
+    details,
+    itemCount: entry.report.items?.length || 0,
+    currentPath: entryName(entry),
+    error: null
+  };
+}
+
+function setSummary(total, danger, removable, items) {
+  $('total-count').textContent = total;
+  $('danger-count').textContent = danger;
+  $('removable-count').textContent = removable;
+  $('item-count').textContent = items;
 }
 
 function groupFindings(findings) {
@@ -310,7 +396,7 @@ function isRedundantMessage(title, message) {
 
 async function cleanSelected() {
   const entry = state.entries[state.selected];
-  if (!entry?.file) return;
+  if (!entry?.file || state.viewMode !== 'file') return;
   $('clean-button').disabled = true;
   $('clean-note').textContent = 'Creating and verifying clean copy…';
   try {
@@ -334,10 +420,86 @@ async function cleanSelected() {
   }
 }
 
-function exportSelected() {
-  const report = state.entries[state.selected]?.report;
-  if (!report) return;
-  download(new Blob([`${JSON.stringify(report, null, 2)}\n`], { type: 'application/json' }), `${baseName(report.target)}.kalypt.json`);
+function exportReport(format) {
+  const view = currentView();
+  if (!view.reports.length) return;
+  const stem = exportStem(view.reports);
+
+  if (format === 'json') {
+    const payload = state.viewMode === 'all'
+      ? {
+          exportedAt: new Date().toISOString(),
+          policy: state.policy,
+          scope: 'all',
+          reports: view.reports.map((entry) => entry.report)
+        }
+      : view.reports[0].report;
+    download(new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: 'application/json' }), `${stem}.json`);
+    return;
+  }
+
+  if (format === 'csv') {
+    download(new Blob([renderCsv(view)], { type: 'text/csv;charset=utf-8' }), `${stem}.csv`);
+    return;
+  }
+
+  download(new Blob([renderHtmlExport(view)], { type: 'text/html;charset=utf-8' }), `${stem}.html`);
+}
+
+function renderCsv(view) {
+  const header = ['severity', 'title', 'category', 'removable', 'path', 'evidence', 'message'];
+  const rows = [header];
+  for (const item of [...view.findings, ...view.details]) {
+    rows.push([
+      item.severity,
+      item.title,
+      item.category,
+      item.removable ? 'yes' : 'no',
+      item.path || '',
+      item.evidence ?? '',
+      item.message || ''
+    ]);
+  }
+  return `${rows.map((row) => row.map(csvCell).join(',')).join('\n')}\n`;
+}
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function renderHtmlExport(view) {
+  const dangerCount = view.findings.filter((item) => item.severity === 'critical' || item.severity === 'high').length;
+  const removableCount = view.findings.filter((item) => item.removable).length;
+  const scope = state.viewMode === 'all' ? `${view.reports.length} files` : entryName(view.reports[0]);
+  const rows = groupFindings(view.findings).map((group) => {
+    const matches = group.matches.map((item) => {
+      const bits = [];
+      if (item.path) bits.push(`<code>${escapeHtml(item.path)}</code>`);
+      if (item.evidence !== undefined && item.evidence !== null && String(item.evidence) !== '') bits.push(`<span>${escapeHtml(String(item.evidence))}</span>`);
+      return `<li>${bits.join(' — ') || 'Match'}</li>`;
+    }).join('');
+    return `<section class="finding ${escapeHtml(group.severity)}"><h2><span>${escapeHtml(group.severity)}</span> ${escapeHtml(group.title)}</h2>${isRedundantMessage(group.title, group.message) ? '' : `<p>${escapeHtml(group.message)}</p>`}<ul>${matches}</ul></section>`;
+  }).join('');
+  const details = view.details.length
+    ? `<section class="details"><h2>Inspection details</h2><ul>${view.details.map((item) => `<li><strong>${escapeHtml(item.title)}</strong>${item.message ? ` — ${escapeHtml(item.message)}` : ''}</li>`).join('')}</ul></section>`
+    : '';
+
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kalypt report</title><style>
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:980px;margin:40px auto;padding:0 24px;color:#1c232b;background:#fff}h1{margin-bottom:4px}.meta{color:#64707d;margin-bottom:24px}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.summary div{border:1px solid #d9dee5;border-radius:10px;padding:12px}.summary strong{display:block;font-size:1.5rem}.finding{border:1px solid #d9dee5;border-left:4px solid #8a97a6;border-radius:10px;padding:12px 14px;margin:10px 0}.finding.critical,.finding.high{border-left-color:#d33}.finding.medium{border-left-color:#d29d16}.finding.low{border-left-color:#2d86b7}.finding h2{font-size:1rem;margin:0 0 6px}.finding h2 span{font-size:.7rem;text-transform:uppercase;color:#66717f}.finding p{margin:0 0 8px;color:#495563}.finding ul,.details ul{margin:6px 0 0;padding-left:20px}code{font-size:.9em}.details{margin-top:24px;border-top:1px solid #d9dee5;padding-top:14px}@media(max-width:700px){.summary{grid-template-columns:repeat(2,1fr)}}
+</style></head><body><h1>Kalypt report</h1><div class="meta">${escapeHtml(scope)} · ${escapeHtml(state.policy)} policy · ${escapeHtml(new Date().toLocaleString())}</div><div class="summary"><div>Findings<strong>${view.findings.length}</strong></div><div>Critical / High<strong>${dangerCount}</strong></div><div>Removable<strong>${removableCount}</strong></div><div>Items inspected<strong>${view.itemCount}</strong></div></div>${rows || '<p>No findings requiring review.</p>'}${details}</body></html>`;
+}
+
+function exportStem(entries) {
+  if (state.viewMode === 'file') return `${baseName(entryName(entries[0]))}.kalypt-report`;
+  const roots = entries.map((entry) => entry.file.webkitRelativePath?.split('/')[0]).filter(Boolean);
+  const commonRoot = roots.length === entries.length && roots.every((root) => root === roots[0]) ? roots[0] : null;
+  return `${commonRoot ? baseName(commonRoot) : 'kalypt'}.report`;
+}
+
+function entryName(entry) {
+  return entry.file.webkitRelativePath || entry.file.name;
 }
 
 function download(blob, name) {

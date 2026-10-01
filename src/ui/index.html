@@ -50,7 +50,13 @@
     <section id="queue" class="queue hidden">
       <div class="section-title">
         <h2>Inspection</h2>
-        <span id="queue-status"></span>
+        <div class="inspection-toolbar">
+          <div id="view-switch" class="view-switch hidden" aria-label="Inspection view">
+            <button id="view-all" type="button" class="compact secondary mode-button">All findings</button>
+            <button id="view-file" type="button" class="compact secondary mode-button">By file</button>
+          </div>
+          <span id="queue-status"></span>
+        </div>
       </div>
       <div id="file-tabs" class="file-tabs"></div>
     </section>
@@ -64,7 +70,14 @@
       </div>
       <div class="result-actions">
         <button id="clean-button" type="button">Create clean copy</button>
-        <button id="export-button" type="button" class="secondary">Export JSON</button>
+        <details id="export-menu" class="export-menu">
+          <summary>Export report</summary>
+          <div class="export-options">
+            <button type="button" data-export-format="html">HTML</button>
+            <button type="button" data-export-format="csv">CSV</button>
+            <button type="button" data-export-format="json">JSON</button>
+          </div>
+        </details>
       </div>
       <div id="clean-note" class="note"></div>
       <div id="findings" class="findings"></div>

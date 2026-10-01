@@ -10,6 +10,8 @@ Files carry baggage. Photos can contain GPS coordinates and device details. Offi
 
 Kalypt checks for that stuff **locally, before you share it**.
 
+> **Your files never leave your device. Neither do your scan results.**
+
 No account. No upload service. No background daemon. When Kalypt can clean something safely, it writes a new copy and leaves the original alone.
 
 > **Status:** `0.3.0` is an early public build. The core scanner, cleaners, CLI, local UI, Git integration, policies, baselines, plugin API, reports, tests, and CI are working. Some format support is intentionally conservative; see the [roadmap](docs/ROADMAP.md).

@@ -8,6 +8,10 @@ import { inspectText } from '../src/inspectors/text.js';
 import { readZip, writeZip } from '../src/formats/zip.js';
 import { scanTarget } from '../src/scan.js';
 
+function fakeGitHubToken() {
+  return 'gh' + 'p_' + '123456789012345678901234567890123456';
+}
+
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000000020001e221bc330000000049454e44ae426082', 'hex');
 
 test('detects common file signatures', () => {
@@ -17,7 +21,7 @@ test('detects common file signatures', () => {
 });
 
 test('secret scanner redacts credential evidence', () => {
-  const findings = inspectText('token = ghp_123456789012345678901234567890123456', 'fixture', 'fixture');
+  const findings = inspectText(`token = ${fakeGitHubToken()}`, 'fixture', 'fixture');
   const secret = findings.find((f) => f.category === 'secret.github-token');
   assert.ok(secret);
   assert.ok(secret.evidence.includes('…'));
@@ -45,7 +49,7 @@ test('scanTarget finds local paths and emails', async () => {
 });
 
 test('specific secret patterns are not duplicated as generic secret findings', () => {
-  const findings = inspectText('token = ghp_123456789012345678901234567890123456', 'fixture', 'fixture');
+  const findings = inspectText(`token = ${fakeGitHubToken()}`, 'fixture', 'fixture');
   assert.equal(findings.filter((f) => f.category === 'secret.github-token').length, 1);
   assert.equal(findings.filter((f) => f.category === 'secret.generic-secret').length, 0);
 });
